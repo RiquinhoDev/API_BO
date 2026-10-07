@@ -18,6 +18,7 @@ import { botHeaders, botUrl } from './discord/planning'
 import {
   checkSyncFreshness,
   COHORT_ANOMALY_THRESHOLD,
+  INACTIVATION_DAY_OF_MONTH,
   computeInactivationCohort,
   computeReactivationCohort,
   createCohortPort,
@@ -159,6 +160,13 @@ export async function runCycleInactivation(now: Date = new Date()): Promise<Cycl
     discordFailed: 0,
     skipped: null,
     listId: null,
+  }
+
+  // Corre todos os dias a partir do 16 e desiste assim que o ciclo estiver
+  // feito. Assim, um dia em que o sync falhou custa um dia, não o mês.
+  if (now.getUTCDate() < INACTIVATION_DAY_OF_MONTH) {
+    report.skipped = `antes do dia ${INACTIVATION_DAY_OF_MONTH} do mês`
+    return report
   }
 
   if (await jaCorreuNesteCiclo(cycleKey)) {

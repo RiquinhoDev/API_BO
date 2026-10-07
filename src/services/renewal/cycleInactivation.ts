@@ -23,9 +23,17 @@ export const COHORT_ANOMALY_THRESHOLD = 200
 /**
  * Idade máxima da última sincronização com a Hotmart para a inactivação poder
  * correr. Sem dados frescos, uma renovação de ontem ainda não chegou cá e o
- * aluno parece expirado — inactivá-lo seria tirar acesso a quem pagou.
+ * aluno parece expirado.
+ *
+ * Adiar não custa o ciclo: a rotina corre todos os dias a partir do dia da
+ * inactivação e pára assim que o ciclo estiver feito. Um dia de atraso é
+ * barato; um ciclo inteiro por inactivar, porque o cron só disparava no dia 16
+ * e nesse dia o sync tinha falhado, era caro e silencioso.
  */
 export const SYNC_FRESHNESS_HOURS = 12
+
+/** Dia do mês a partir do qual a inactivação do ciclo pode correr. */
+export const INACTIVATION_DAY_OF_MONTH = 16
 
 export interface CycleStudent {
   readonly userId: mongoose.Types.ObjectId

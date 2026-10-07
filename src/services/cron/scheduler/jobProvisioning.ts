@@ -92,8 +92,8 @@ const JOBS: readonly SystemJobDefinition[] = [
   {
     name: 'RenewalCycleInactivation',
     description:
-      'Dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra), não por turma — o nome da turma fica desactualizado numa renovação e inactivava gente com um mês de antecedência. Recalcula no momento, por isso quem renovou entretanto sai do grupo sozinho. Não corre sem o HotmartSync recente, e pára acima de 200 alunos. Nasce desligado.',
-    cronExpression: '0 7 16 * *',
+      'A partir do dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra), não por turma — o nome da turma fica desactualizado numa renovação e inactivava gente com um mês de antecedência. Recalcula no momento, por isso quem renovou entretanto sai do grupo sozinho. Corre todos os dias e pára assim que o ciclo estiver feito: se o HotmartSync não estiver recente, adia para o dia seguinte em vez de deixar o mês por inactivar. Pára acima de 200 alunos. Nasce desligado.',
+    cronExpression: '0 7 * * *',
     enabled: false,
     updateSchedule: false,
     maxRetries: 1,
