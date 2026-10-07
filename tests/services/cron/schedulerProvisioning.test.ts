@@ -24,25 +24,30 @@ const repository = (jobs: CronProvisioningJob[] = []) => {
 }
 
 describe('CronJobProvisioner', () => {
-  it('creates the seven system jobs in their established order', async () => {
+  it('creates the nine system jobs in their established order', async () => {
     const repo = repository()
     const provisioner = new CronJobProvisioner(repo, () => nextRun)
 
     await provisioner.ensureSystemJobs()
 
-    expect(repo.create).toHaveBeenCalledTimes(7)
+    expect(repo.create).toHaveBeenCalledTimes(9)
     expect(jest.mocked(repo.create).mock.calls.map(([seed]) => seed.name)).toEqual([
       'RenewalOfferSync',
       'AchievementEvaluation',
       'RenewalAcSync',
       'DiscordRolesSync',
       'DiscordScheduledMessages',
+      'RenewalCycleInactivation',
+      'RenewalReactivation',
       'AcTagWatch',
       'HotmartOgiProgressRefresh'
     ])
+    // As duas novas nascem desligadas, como todas as que tocam em acesso.
     expect(jest.mocked(repo.create).mock.calls.map(([seed]) => seed.schedule.enabled)).toEqual([
       true,
       true,
+      false,
+      false,
       false,
       false,
       false,
@@ -64,7 +69,7 @@ describe('CronJobProvisioner', () => {
     expect(job.schedule.cronExpression).toBe('0 5 * * *')
     expect(job.nextRun).toEqual(nextRun)
     expect(job.save).toHaveBeenCalledTimes(1)
-    expect(repo.create).toHaveBeenCalledTimes(6)
+    expect(repo.create).toHaveBeenCalledTimes(8)
   })
 
   it('preserves an existing disabled kill-switch job without rewriting it', async () => {

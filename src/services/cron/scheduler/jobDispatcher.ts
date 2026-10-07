@@ -34,6 +34,8 @@ export interface CronDispatchDependencies {
   guruTrialCheck: UnknownRunner
   syncRenewalOffers: UnknownRunner
   runScheduledMessages: UnknownRunner
+  runCycleInactivation: UnknownRunner
+  runRenewalReactivation: UnknownRunner
   runDiscordRolesSync: UnknownRunner
   runRenewalAcSync: UnknownRunner
   runAcTagWatch: UnknownRunner
@@ -63,7 +65,9 @@ const SPECIFIC_JOB_NAMES = [
   'DiscordRolesSync',
   'DiscordScheduledMessages',
   'AcTagWatch',
-  'HotmartOgiProgressRefresh'
+  'HotmartOgiProgressRefresh',
+  'RenewalCycleInactivation',
+  'RenewalReactivation'
 ] as const
 
 const recordOf = (value: unknown): Record<string, unknown> =>
@@ -138,6 +142,10 @@ const defaultDependencies: CronDispatchDependencies = {
   syncRenewalOffers,
   runScheduledMessages: async () =>
     (await import('../../renewal/discordScheduledMessages.service')).runScheduledMessagesJob(),
+  runCycleInactivation: async () =>
+    (await import('../../renewal/cycleInactivation.runtime')).runCycleInactivation(),
+  runRenewalReactivation: async () =>
+    (await import('../../renewal/cycleInactivation.runtime')).runRenewalReactivation(),
   runDiscordRolesSync: async () =>
     (await import('../../renewal/discordRolesSync.service')).runDiscordRolesSyncJob(),
   runRenewalAcSync: async () =>
@@ -211,6 +219,25 @@ export class CronJobDispatcher {
             skipped: arrayOf(report, 'unknownNames').length
           },
           errorMessage: undefined
+        }
+      }
+
+      if (job.name.includes('RenewalCycleInactivation') || job.name.includes('RenewalReactivation')) {
+        const inactivation = job.name.includes('RenewalCycleInactivation')
+        const report = recordOf(await (inactivation
+          ? this.dependencies.runCycleInactivation()
+          : this.dependencies.runRenewalReactivation()))
+        const skipped = report.skipped ? [String(report.skipped)] : []
+        return {
+          success: true,
+          stats: {
+            total: numberOf(report, 'cohort'),
+            inserted: 0,
+            updated: numberOf(report, 'applied'),
+            errors: numberOf(report, 'discordFailed'),
+            skipped: skipped.length,
+          },
+          ...(skipped.length > 0 ? { errorMessage: skipped.join('; ') } : {}),
         }
       }
 

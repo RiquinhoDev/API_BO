@@ -90,6 +90,26 @@ const JOBS: readonly SystemJobDefinition[] = [
     exponentialBackoff: false
   },
   {
+    name: 'RenewalCycleInactivation',
+    description:
+      'Dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra), não por turma — o nome da turma fica desactualizado numa renovação e inactivava gente com um mês de antecedência. Recalcula no momento, por isso quem renovou entretanto sai do grupo sozinho. Não corre sem o HotmartSync recente, e pára acima de 200 alunos. Nasce desligado.',
+    cronExpression: '0 7 16 * *',
+    enabled: false,
+    updateSchedule: false,
+    maxRetries: 1,
+    exponentialBackoff: false
+  },
+  {
+    name: 'RenewalReactivation',
+    description:
+      'Diária: repõe o acesso a quem foi inactivado por nós e entretanto renovou — o fim de acesso voltou a estar no futuro. Repõe estado, produtos, histórico e troca o cargo Inativo por Ativo no Discord. Sem limiar de anomalia: repor acesso a quem pagou é benigno e não deve esperar por aprovação. É a rede de segurança da inactivação do dia 16. Nasce desligado.',
+    cronExpression: '30 7 * * *',
+    enabled: false,
+    updateSchedule: false,
+    maxRetries: 1,
+    exponentialBackoff: false
+  },
+  {
     name: 'AcTagWatch',
     description:
       'Lê as tags obrigatórias da AC e regista quem as mexeu fora do nosso sistema. NÃO escreve na ActiveCampaign — só lê e grava em actagevents. Trigger próprio, independente do RenewalPipeline/RenewalAcSync. Nasce desligado.',
