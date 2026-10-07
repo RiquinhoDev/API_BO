@@ -162,7 +162,10 @@ export interface CallRoleApplyPort {
   }>): Promise<void>
 }
 
-const BATCH = 50
+// O bot recusa acima de 25 por chamada ('máximo 25 operações por chamada') e
+// aplica ~1,1s por membro, sequencialmente. Com 25, cada lote leva ~28s — bem
+// dentro do timeout de 120s. Com 50 era um 400 à primeira tentativa.
+const BATCH = 25
 
 /**
  * Põe o cargo em quem é para chamar e tira-o a quem já lá não pertence.
