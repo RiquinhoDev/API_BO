@@ -336,9 +336,17 @@ export async function sendScheduledRuleNow(
     return { success: false, message: `Já foi enviada este mês (${target.monthKey}) — não reenvio para não duplicar` }
   }
 
-  const members = await DiscordRoleState.countDocuments({ roleId: target.roleId })
+  // Mesmo caminho do cron: o envio manual não pode mencionar a etiqueta, senão
+  // o botão do BO chamava as três coortes que o cron deixou de chamar.
+  const { chamada, membros: members } = await prepararChamada(now)
+  if (!chamada.configured) {
+    return { success: false, message: 'DISCORD_RENEWAL_CALL_ROLE_ID por configurar — aviso não sai sem audiência definida' }
+  }
+  if (chamada.failed > 0) {
+    return { success: false, message: `${chamada.failed} contas falharam ao receber o cargo — envio recusado para não sair incompleto` }
+  }
   if (members === 0) {
-    return { success: false, message: `Cargo ${target.roleName} sem membros — mês sem renovações, nada enviado` }
+    return { success: false, message: `Ciclo ${chamada.cycleKey} sem ninguém por renovar — nada enviado` }
   }
 
   const template = await DiscordMessageTemplate.findOne({ key: rule.templateKey }).lean().exec()
@@ -346,7 +354,7 @@ export async function sendScheduledRuleNow(
 
   const result = await sendDiscordMessage({
     content: template.content,
-    mentionRoleIds: [target.roleId],
+    mentionRoleIds: [chamada.roleId as string],
     dataFim: target.dataFim,
     channelId: rule.channelId || undefined,
     templateKey: rule.templateKey,
