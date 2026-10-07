@@ -99,12 +99,12 @@ export const JOBS: readonly SystemJobDefinition[] = [
   {
     name: 'RenewalCycleInactivation',
     description:
-      'A partir do dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra) e não pelo nome da turma, que fica desactualizado numa renovação. Recalcula no momento, por isso quem renovou entretanto sai sozinho. Corre todos os dias e pára assim que o ciclo estiver feito: sem HotmartSync recente adia um dia, em vez de deixar o mês por inactivar. Pára acima de 200 alunos.',
-    cronExpression: '0 7 * * *',
+      'Dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra) e não pelo nome da turma, que fica desactualizado numa renovação. Recalcula no momento, por isso quem renovou entretanto sai sozinho. Não corre sem o HotmartSync recente, e pára acima de 200 alunos.',
+    cronExpression: '0 7 16 * *',
     enabled: false,
-    // A expressão é semântica: o dia 16 é uma condição no código, não no cron.
-    // Se as duas camadas divergirem, o travão de frescura volta a custar o mês
-    // inteiro em vez de um dia — por isso o código manda, e um deploy repõe-a.
+    // Uma corrida por mês, no dia 16. O portão do dia continua no código como
+    // segunda tranca, mas é o calendário que manda — foi decisão da chefia que
+    // o agendamento diga o que faz, e não que o job acorde todos os dias.
     updateSchedule: true,
     maxRetries: 1,
     exponentialBackoff: false
