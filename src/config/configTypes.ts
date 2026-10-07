@@ -125,6 +125,12 @@ export interface RenewalConfig {
   readonly discordScheduledMessagesEnabled: boolean
   readonly discordRolesMaxOpsPerRun: number
   readonly discordMessageChannelId?: string
+  /**
+   * Cargo transitório que marca quem é chamado no aviso do ciclo corrente.
+   * As etiquetas R.{mês} são permanentes e cobrem todas as coortes; este é
+   * posto e retirado a cada ciclo, e é o único que o aviso menciona.
+   */
+  readonly discordCallRoleId?: string
   readonly discordMessageChannels: readonly string[]
 }
 

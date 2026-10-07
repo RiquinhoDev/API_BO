@@ -306,6 +306,7 @@ function parseRenewal(env: NodeJS.ProcessEnv, integrations: IntegrationConfigs):
     { min: 1, max: 10_000, defaultValue: 100 },
   )
   const discordMessageChannelId = parseDiscordChannelId(env.DISCORD_MESSAGE_CHANNEL_ID)
+  const discordCallRoleId = parseDiscordChannelId(env.DISCORD_RENEWAL_CALL_ROLE_ID)
   const discordMessageChannels = parseMessageChannels(env.DISCORD_MESSAGE_CHANNELS)
 
   if (
@@ -354,6 +355,7 @@ function parseRenewal(env: NodeJS.ProcessEnv, integrations: IntegrationConfigs):
     discordScheduledMessagesEnabled,
     discordRolesMaxOpsPerRun,
     ...(discordMessageChannelId ? { discordMessageChannelId } : {}),
+    ...(discordCallRoleId ? { discordCallRoleId } : {}),
     discordMessageChannels,
   }
 }

@@ -12,6 +12,7 @@ import {
 import {
   ALL_RENEWAL_ROLE_IDS,
   APPROVED_TTL_HOURS,
+  callRoleId,
   botHeaders,
   botUrl,
   configuredBotUrl,
@@ -322,9 +323,12 @@ export async function sendDiscordMessage(params: {
     return { success: false, message: 'DISCORD_MESSAGES_ENABLED != true — envio recusado (nada publicado)' }
   }
 
-  const roleIds = params.mentionRoleIds.filter((id) => ALL_RENEWAL_ROLE_IDS.includes(id))
+  // O cargo de chamada entra na allowlist porque é ele que os avisos mencionam;
+  // as etiquetas R.* continuam permitidas para envios manuais.
+  const permitidos = [...ALL_RENEWAL_ROLE_IDS, callRoleId()].filter(Boolean) as string[]
+  const roleIds = params.mentionRoleIds.filter((id) => permitidos.includes(id))
   if (roleIds.length !== params.mentionRoleIds.length) {
-    return { success: false, message: 'mentionRoleIds contém cargos fora da allowlist R.*' }
+    return { success: false, message: 'mentionRoleIds contém cargos fora da allowlist' }
   }
 
   const channelId = params.channelId || getDefaultMessageChannelId()

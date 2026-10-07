@@ -27,11 +27,18 @@ import {
   DiscordRoleState,
   IDiscordScheduledRule
 } from '../../models/discordRenewal'
+import axios from 'axios'
 import {
   RENEWAL_ROLES,
   renderMessage,
   sendDiscordMessage
 } from './discordRolesSync.service'
+import { botHeaders, botUrl, callRoleId } from './discord/planning'
+import {
+  computeCallAudience,
+  createCallAudiencePort,
+  syncCallRole
+} from './discord/renewalCallRole'
 
 export const isScheduledMessagesEnabled = () =>
   getRuntimeConfig().renewal.discordScheduledMessagesEnabled
@@ -121,6 +128,26 @@ export interface ScheduledMessagesReport {
   skipped: Array<{ rule: string; reason: string }>
 }
 
+/**
+ * Garante que o cargo de chamada está em quem é para chamar neste ciclo, e
+ * devolve o relatório mais o número de contas. Corre antes de cada envio: é
+ * idempotente, por isso o dia 8 e o dia 15 do mesmo ciclo custam uma passagem
+ * sem operações se nada mudou entretanto.
+ */
+async function prepararChamada(now: Date) {
+  const audiencia = await computeCallAudience(createCallAudiencePort(), now)
+  const chamada = await syncCallRole(audiencia, callRoleId(), {
+    apply: async (operations) => {
+      await axios.post(
+        `${botUrl()}/renewal/roles/apply`,
+        { operations },
+        { headers: botHeaders(), timeout: 120000 },
+      )
+    },
+  })
+  return { chamada, membros: audiencia.discordUserIds.length, audiencia }
+}
+
 export async function runScheduledMessagesJob(): Promise<ScheduledMessagesReport> {
   await ensureDefaultScheduledRules()
 
@@ -163,10 +190,23 @@ export async function runScheduledMessagesJob(): Promise<ScheduledMessagesReport
       continue
     }
 
-    // GUARD: mês sem turma a renovar → cargo sem membros → não anunciar nada
-    const members = await DiscordRoleState.countDocuments({ roleId: target.roleId })
+    // O aviso menciona o cargo de chamada, não a etiqueta R.{mês}. A etiqueta é
+    // permanente e cobre todas as coortes — mencioná-la chamaria quem terminou
+    // há dois anos e quem já renovou, a par de quem é mesmo para chamar.
+    const { chamada, membros } = await prepararChamada(now)
+    if (!chamada.configured) {
+      await skip('DISCORD_RENEWAL_CALL_ROLE_ID por configurar — aviso não sai sem audiência definida')
+      continue
+    }
+    if (chamada.failed > 0) {
+      await skip(`${chamada.failed} contas falharam ao receber o cargo — aviso adiado para não sair incompleto`)
+      continue
+    }
+
+    // GUARD: ciclo sem ninguém a renovar → não anunciar nada
+    const members = membros
     if (members === 0) {
-      await skip(`cargo ${target.roleName} sem membros — mês sem renovações, nada enviado`)
+      await skip(`ciclo ${chamada.cycleKey} sem ninguém por renovar — nada enviado`)
       continue
     }
 
@@ -178,7 +218,7 @@ export async function runScheduledMessagesJob(): Promise<ScheduledMessagesReport
 
     const result = await sendDiscordMessage({
       content: template.content,
-      mentionRoleIds: [target.roleId],
+      mentionRoleIds: [chamada.roleId as string],
       dataFim: target.dataFim,
       channelId: rule.channelId || undefined,
       templateKey: rule.templateKey,

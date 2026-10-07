@@ -75,6 +75,11 @@ export const RENEWAL_ROLES: Record<number, { roleId: string; roleName: string }>
   12: { roleId: '1525120419768696872', roleName: 'R. Dezembro' }
 }
 
+/** Cargo transitório mencionado pelos avisos; vazio quando não configurado. */
+export function callRoleId(): string | null {
+  return getRuntimeConfig().renewal.discordCallRoleId || null
+}
+
 export const ALL_RENEWAL_ROLE_IDS = Object.values(RENEWAL_ROLES).map((r) => r.roleId)
 export const ROLE_NAME_BY_ID = new Map(Object.values(RENEWAL_ROLES).map((r) => [r.roleId, r.roleName]))
 

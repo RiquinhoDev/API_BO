@@ -133,6 +133,29 @@ const discordRoleStateSchema = new Schema<IDiscordRoleState>(
 )
 
 // ─────────────────────────────────────────────────────────────
+// 2b. DiscordCallRoleState — quem tem o cargo de chamada deste ciclo
+// ─────────────────────────────────────────────────────────────
+// Espelho do cargo transitório que o aviso menciona. Separado do estado das
+// etiquetas R.{mês} de propósito: aquelas são permanentes, esta rota-se a cada
+// ciclo, e misturar as duas tornaria impossível saber a quem tirar o cargo.
+
+export interface IDiscordCallRoleState extends Document {
+  discordUserId: string
+  /** Ciclo 'YYYY-MM' em que o cargo foi posto nesta conta. */
+  cycleKey: string
+  appliedAt: Date
+}
+
+const discordCallRoleStateSchema = new Schema<IDiscordCallRoleState>(
+  {
+    discordUserId: { type: String, required: true, unique: true },
+    cycleKey: { type: String, required: true, index: true },
+    appliedAt: { type: Date, required: true }
+  },
+  { timestamps: true, collection: 'discordcallrolestates' }
+)
+
+// ─────────────────────────────────────────────────────────────
 // 3. DiscordMessageTemplate — textos editáveis na UI
 // ─────────────────────────────────────────────────────────────
 
@@ -230,6 +253,9 @@ export const DiscordRoleChange: mongoose.Model<IDiscordRoleChange> = mongoose.mo
 
 export const DiscordRoleState: mongoose.Model<IDiscordRoleState> = mongoose.models.DiscordRoleState ||
   mongoose.model<IDiscordRoleState>('DiscordRoleState', discordRoleStateSchema)
+
+export const DiscordCallRoleState: mongoose.Model<IDiscordCallRoleState> = mongoose.models.DiscordCallRoleState ||
+  mongoose.model<IDiscordCallRoleState>('DiscordCallRoleState', discordCallRoleStateSchema)
 
 export const DiscordMessageTemplate: mongoose.Model<IDiscordMessageTemplate> = mongoose.models.DiscordMessageTemplate ||
   mongoose.model<IDiscordMessageTemplate>('DiscordMessageTemplate', discordMessageTemplateSchema)
