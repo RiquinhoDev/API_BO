@@ -122,6 +122,8 @@ export interface DiscordPlanReport {
   studentsLinked: number
   accountsDesired: number
   invalidTurma: number
+  /** Alunos com acesso ainda a correr — já renovaram, não levam cargo. */
+  acessoActivo: number
   planned: number
   newAssignments: number // contas sem cargo registado → primeira atribuição (nunca é anomalia)
   realChanges: number // cargos já aplicados que mudariam/seriam removidos (sujeitos ao detector)
@@ -134,6 +136,7 @@ export interface DiscordPlanReport {
 
 export async function generateDiscordRolesPlan(): Promise<DiscordPlanReport> {
   const batchId = `discord-${new Date().toISOString().replace(/[:.]/g, '-')}`
+  const now = new Date()
 
   const report: DiscordPlanReport = {
     batchId,
@@ -142,6 +145,7 @@ export async function generateDiscordRolesPlan(): Promise<DiscordPlanReport> {
     studentsLinked: 0,
     accountsDesired: 0,
     invalidTurma: 0,
+    acessoActivo: 0,
     planned: 0,
     newAssignments: 0,
     realChanges: 0,
@@ -192,6 +196,21 @@ export async function generateDiscordRolesPlan(): Promise<DiscordPlanReport> {
     // aqui (esse exige hasTurma, que este novo formato não tem).
     if (!parsed.hasExpiry || !parsed.accessEndOgi) {
       report.invalidTurma += 1
+      continue
+    }
+
+    // O cargo R.{mês} é a lista de quem precisa de renovar. Quem ainda está
+    // dentro do período de acesso não precisa — já renovou, ou ainda nem lá
+    // chegou — e não pode ser mencionado num aviso de fim de acesso.
+    //
+    // Sem esta condição o cargo era escolhido só pelo mês do fim de acesso,
+    // ignorando o ano, e acumulava três coortes em cima umas das outras: quem
+    // terminou em Setembro de 2025, quem terminou em Setembro de 2026, e quem
+    // só termina em Setembro de 2027 por ter renovado. Em Outubro e Agosto o
+    // cargo tinha apenas gente com acesso activo — um aviso nesses meses ia
+    // inteiro para quem já tinha pago.
+    if (parsed.accessEndOgi.getTime() > now.getTime()) {
+      report.acessoActivo += 1
       continue
     }
 
