@@ -75,12 +75,6 @@ export const RENEWAL_ROLES: Record<number, { roleId: string; roleName: string }>
   12: { roleId: '1525120419768696872', roleName: 'R. Dezembro' }
 }
 
-/**
- * Quanto tempo depois de expirar é que um aluno continua a contar como "a
- * renovar". Doze meses deixa cada cargo mensal com uma coorte só.
- */
-const RENEWAL_WINDOW_MS = 365 * 24 * 60 * 60 * 1000
-
 export const ALL_RENEWAL_ROLE_IDS = Object.values(RENEWAL_ROLES).map((r) => r.roleId)
 export const ROLE_NAME_BY_ID = new Map(Object.values(RENEWAL_ROLES).map((r) => [r.roleId, r.roleName]))
 
@@ -128,10 +122,6 @@ export interface DiscordPlanReport {
   studentsLinked: number
   accountsDesired: number
   invalidTurma: number
-  /** Alunos com acesso ainda a correr — já renovaram, não levam cargo. */
-  acessoActivo: number
-  /** Alunos cujo acesso terminou num ciclo anterior — fora da janela de renovação. */
-  cicloAnterior: number
   planned: number
   newAssignments: number // contas sem cargo registado → primeira atribuição (nunca é anomalia)
   realChanges: number // cargos já aplicados que mudariam/seriam removidos (sujeitos ao detector)
@@ -142,21 +132,8 @@ export interface DiscordPlanReport {
   overCap: boolean
 }
 
-export interface PlanOptions {
-  /**
-   * Autoriza uma reconciliação acima do limiar de anomalia. Serve para
-   * migrações deliberadas — uma mudança de regra move milhares de cargos de
-   * uma vez e é indistinguível, para o limiar, de uma falha de dados da
-   * Hotmart. Exige motivo escrito, que fica no log.
-   */
-  readonly allowBulk?: { readonly reason: string }
-}
-
-export async function generateDiscordRolesPlan(
-  options: PlanOptions = {},
-): Promise<DiscordPlanReport> {
+export async function generateDiscordRolesPlan(): Promise<DiscordPlanReport> {
   const batchId = `discord-${new Date().toISOString().replace(/[:.]/g, '-')}`
-  const now = new Date()
 
   const report: DiscordPlanReport = {
     batchId,
@@ -165,8 +142,6 @@ export async function generateDiscordRolesPlan(
     studentsLinked: 0,
     accountsDesired: 0,
     invalidTurma: 0,
-    acessoActivo: 0,
-    cicloAnterior: 0,
     planned: 0,
     newAssignments: 0,
     realChanges: 0,
@@ -217,35 +192,6 @@ export async function generateDiscordRolesPlan(
     // aqui (esse exige hasTurma, que este novo formato não tem).
     if (!parsed.hasExpiry || !parsed.accessEndOgi) {
       report.invalidTurma += 1
-      continue
-    }
-
-    // O cargo R.{mês} é a lista de quem precisa de renovar. Quem ainda está
-    // dentro do período de acesso não precisa — já renovou, ou ainda nem lá
-    // chegou — e não pode ser mencionado num aviso de fim de acesso.
-    //
-    // Sem esta condição o cargo era escolhido só pelo mês do fim de acesso,
-    // ignorando o ano, e acumulava três coortes em cima umas das outras: quem
-    // terminou em Setembro de 2025, quem terminou em Setembro de 2026, e quem
-    // só termina em Setembro de 2027 por ter renovado. Em Outubro e Agosto o
-    // cargo tinha apenas gente com acesso activo — um aviso nesses meses ia
-    // inteiro para quem já tinha pago.
-    if (parsed.accessEndOgi.getTime() > now.getTime()) {
-      report.acessoActivo += 1
-      continue
-    }
-
-    // ... e também não é de quem expirou num ciclo anterior. Como só há doze
-    // cargos, um por mês, sem esta janela o cargo guardava para sempre todas
-    // as coortes que alguma vez terminaram nesse mês: em R. Setembro estavam
-    // 256 pessoas que terminaram em Setembro de 2025 ao lado das 141 que
-    // terminaram em Setembro de 2026. O aviso anuncia uma data só — a do
-    // ciclo corrente — e para as outras essa data é falsa.
-    //
-    // Doze meses é a janela natural: cada cargo fica com a coorte mais recente
-    // do seu mês, que é exactamente quem devia renovar agora e ainda não o fez.
-    if (parsed.accessEndOgi.getTime() < now.getTime() - RENEWAL_WINDOW_MS) {
-      report.cicloAnterior += 1
       continue
     }
 
@@ -303,14 +249,7 @@ export async function generateDiscordRolesPlan(
 
   if (!report.isBackfill) {
     const threshold = Math.max(30, Math.ceil(Math.max(stateByAccount.size, 1) * 0.05))
-    if (report.realChanges > threshold && options.allowBulk) {
-      // Deliberado: fica registado quem o autorizou e porquê, para a passagem
-      // ser distinguível de uma anomalia quando alguém reler os logs.
-      logger.warn(
-        `⚠️ [DiscordRoles] reconciliação em massa autorizada: ${report.realChanges} mudanças `
-        + `(limiar ${threshold}) — motivo: ${options.allowBulk.reason}`,
-      )
-    } else if (report.realChanges > threshold) {
+    if (report.realChanges > threshold) {
       report.anomalyAborted = true
       report.anomalyDetail = `${report.realChanges} mudanças de cargos JÁ aplicados (> limiar ${threshold}) — provável anomalia nos dados, plano NÃO gerado (novas atribuições: ${report.newAssignments}, não contam)`
       logger.error(`🚨 [DiscordRoles] ${report.anomalyDetail}`)

@@ -73,21 +73,8 @@ router.get('/changes', asyncRoute(async (req: Request, res: Response) => {
 }))
 
 /** POST /api/discord-renewal/plan — reconciliação (dry-run, só BD) */
-/**
- * POST /api/discord-renewal/plan  { allowBulkReason?: string }
- *
- * `allowBulkReason` autoriza uma reconciliação acima do limiar de anomalia.
- * É para migrações deliberadas, uma de cada vez: o limiar continua a proteger
- * as corridas normais, e o motivo fica no log para a passagem ser
- * distinguível de uma falha de dados quando alguém reler o histórico.
- */
-router.post('/plan', asyncRoute(async (req: Request, res: Response) => {
-  const motivo = typeof req.body?.allowBulkReason === 'string'
-    ? req.body.allowBulkReason.trim()
-    : ''
-  const report = await generateDiscordRolesPlan(
-    motivo ? { allowBulk: { reason: motivo } } : {},
-  )
+router.post('/plan', asyncRoute(async (_req: Request, res: Response) => {
+  const report = await generateDiscordRolesPlan()
   const outcome = report.anomalyAborted ? 'anomaly-aborted' : 'planned'
   res.json(successResponse({ outcome, report }))
 }))
