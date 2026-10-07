@@ -5,6 +5,7 @@ const SYSTEM_CRON_ADMIN_ID = new mongoose.Types.ObjectId('0000000000000000000000
 
 export interface CronProvisioningJob {
   name: string
+  description?: string
   schedule: { cronExpression: string }
   nextRun?: Date
   save(): Promise<unknown>
@@ -95,7 +96,10 @@ const JOBS: readonly SystemJobDefinition[] = [
       'A partir do dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra), não por turma — o nome da turma fica desactualizado numa renovação e inactivava gente com um mês de antecedência. Recalcula no momento, por isso quem renovou entretanto sai do grupo sozinho. Corre todos os dias e pára assim que o ciclo estiver feito: se o HotmartSync não estiver recente, adia para o dia seguinte em vez de deixar o mês por inactivar. Pára acima de 200 alunos. Nasce desligado.',
     cronExpression: '0 7 * * *',
     enabled: false,
-    updateSchedule: false,
+    // A expressão é semântica: o dia 16 é uma condição no código, não no cron.
+    // Se as duas camadas divergirem, o travão de frescura volta a custar o mês
+    // inteiro em vez de um dia — por isso o código manda, e um deploy repõe-a.
+    updateSchedule: true,
     maxRetries: 1,
     exponentialBackoff: false
   },
@@ -146,10 +150,20 @@ export class CronJobProvisioner {
   private async ensureJob(definition: SystemJobDefinition): Promise<void> {
     const existing = await this.repository.findByName(definition.name)
     if (existing) {
-      if (definition.updateSchedule && existing.schedule.cronExpression !== definition.cronExpression) {
-        existing.schedule.cronExpression = definition.cronExpression
-        existing.nextRun = this.calculateNextRun(definition.cronExpression)
-        await existing.save()
+      if (definition.updateSchedule) {
+        let changed = false
+        if (existing.schedule.cronExpression !== definition.cronExpression) {
+          existing.schedule.cronExpression = definition.cronExpression
+          existing.nextRun = this.calculateNextRun(definition.cronExpression)
+          changed = true
+        }
+        // A descrição é o que o operador lê antes de ligar o job. Deixá-la a
+        // descrever um comportamento que já mudou é pior do que não a ter.
+        if (existing.description !== definition.description) {
+          existing.description = definition.description
+          changed = true
+        }
+        if (changed) await existing.save()
       }
       return
     }

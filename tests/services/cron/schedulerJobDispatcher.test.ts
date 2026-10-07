@@ -37,6 +37,16 @@ const createDependencies = (): jest.Mocked<CronDispatchDependencies> => ({
     jaExistiam: 2,
     errors: [{ contexto: 'x', error: 'boom' }]
   })),
+  runCycleInactivation: jest.fn(async () => ({
+    cycleKey: '2026-09', cohort: 3, applied: 3, discordApplied: 3, discordFailed: 0,
+    skipped: null, listId: 'abc'
+  })),
+  runRenewalReactivation: jest.fn(async () => ({
+    cycleKey: '2026-09', cohort: 1, applied: 1, discordApplied: 1, discordFailed: 0,
+    skipped: null, listId: null
+  })),
+  isRenewalPipelineEnabled: jest.fn(async () => false),
+  runRenewalPipeline: jest.fn(async () => ({ ok: true })),
   refreshHotmartOgiProgress: jest.fn(async () => ({ total: 12, updated: 9, skipped: 2, errors: 1 })),
   evaluateAchievements: jest.fn(async () => ({ total: 5, evaluated: 4, errors: 1 })),
   executeDailyPipeline: jest.fn(async () => ({
