@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
 import { SyncType } from '../../../models/SyncModels/CronJobConfig'
+import logger from '../../../utils/logger'
 
 const SYSTEM_CRON_ADMIN_ID = new mongoose.Types.ObjectId('000000000000000000000001')
 
@@ -44,7 +45,12 @@ interface SystemJobDefinition {
   exponentialBackoff: boolean
 }
 
-const JOBS: readonly SystemJobDefinition[] = [
+/**
+ * Exportado para o teste poder medir as descrições contra o limite do schema.
+ * Uma descrição grande de mais só falha no arranque, em produção, e leva o
+ * agendamento inteiro atrás — é tarde de mais para descobrir.
+ */
+export const JOBS: readonly SystemJobDefinition[] = [
   {
     name: 'RenewalOfferSync',
     description: 'Sincroniza diariamente ofertas de renovação OGI a partir da Hotmart',
@@ -93,7 +99,7 @@ const JOBS: readonly SystemJobDefinition[] = [
   {
     name: 'RenewalCycleInactivation',
     description:
-      'A partir do dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra), não por turma — o nome da turma fica desactualizado numa renovação e inactivava gente com um mês de antecedência. Recalcula no momento, por isso quem renovou entretanto sai do grupo sozinho. Corre todos os dias e pára assim que o ciclo estiver feito: se o HotmartSync não estiver recente, adia para o dia seguinte em vez de deixar o mês por inactivar. Pára acima de 200 alunos. Nasce desligado.',
+      'A partir do dia 16: inactiva quem terminou o acesso ao OGI no ciclo anterior. Escolhe por aluno, pelo fim de acesso canónico (nome da turma + data de compra) e não pelo nome da turma, que fica desactualizado numa renovação. Recalcula no momento, por isso quem renovou entretanto sai sozinho. Corre todos os dias e pára assim que o ciclo estiver feito: sem HotmartSync recente adia um dia, em vez de deixar o mês por inactivar. Pára acima de 200 alunos.',
     cronExpression: '0 7 * * *',
     enabled: false,
     // A expressão é semântica: o dia 16 é uma condição no código, não no cron.
@@ -143,7 +149,15 @@ export class CronJobProvisioner {
 
   async ensureSystemJobs(): Promise<void> {
     for (const definition of JOBS) {
-      await this.ensureJob(definition)
+      // Cada seed por sua conta. Até aqui, uma descrição grande de mais rebentava
+      // o `ensureSystemJobs` inteiro — e como ele corre ANTES do ciclo que agenda
+      // os jobs, o scheduler ficava sem agendar nenhum. Um seed mau não pode
+      // valer uma noite sem crons.
+      try {
+        await this.ensureJob(definition)
+      } catch (error) {
+        logger.error(`[Provisioning] seed '${definition.name}' falhou`, { error })
+      }
     }
   }
 

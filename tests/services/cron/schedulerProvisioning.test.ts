@@ -2,8 +2,10 @@ import mongoose from 'mongoose'
 import {
   CronJobProvisioner,
   CronProvisioningJob,
-  CronProvisioningRepository
+  CronProvisioningRepository,
+  JOBS
 } from '../../../src/services/cron/scheduler/jobProvisioning'
+import CronJobConfig from '../../../src/models/SyncModels/CronJobConfig'
 
 const nextRun = new Date('2026-08-10T12:00:00.000Z')
 
@@ -83,4 +85,20 @@ describe('CronJobProvisioner', () => {
     expect(job.save).not.toHaveBeenCalled()
     expect(jest.mocked(repo.create).mock.calls.map(([seed]) => seed.name)).not.toContain('RenewalAcSync')
   })
+})
+
+describe('as seeds cabem no schema', () => {
+  // O schema recusa descrições acima de 500 caracteres, e o provisioning corre
+  // antes de o scheduler agendar seja o que for: uma seed grande de mais não
+  // falha sozinha, deixa a instância inteira sem crons. Aconteceu a 07/10/2026.
+  const limite = (CronJobConfig.schema.path('description') as unknown as {
+    options: { maxlength?: number }
+  }).options.maxlength ?? 500
+
+  it.each(JOBS.map(job => [job.name, job.description] as const))(
+    'descrição de %s cabe no limite',
+    (_name, description) => {
+      expect(description.length).toBeLessThanOrEqual(limite)
+    },
+  )
 })
