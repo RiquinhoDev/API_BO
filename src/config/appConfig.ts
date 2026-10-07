@@ -239,12 +239,19 @@ function parseIntegrations(
   }
 }
 
-function parseDiscordChannelId(value: string | undefined): string | undefined {
+// O nome da variável vem de fora porque esta validação serve mais do que uma.
+// Com o nome fixo na mensagem, um ID mal escrito no cargo de chamada fazia a
+// API rebentar no arranque a queixar-se de outra variável — e quem fosse ler o
+// log ia procurar ao sítio errado.
+function parseDiscordSnowflake(
+  value: string | undefined,
+  name: string,
+): string | undefined {
   if (value === undefined) return undefined
   const normalized = value.trim()
-  if (!normalized) throw new Error('CONFIG_INVALIDA: DISCORD_MESSAGE_CHANNEL_ID e obrigatorio')
+  if (!normalized) throw new Error(`CONFIG_INVALIDA: ${name} e obrigatorio`)
   if (!/^\d+$/.test(normalized)) {
-    throw new Error('CONFIG_INVALIDA: DISCORD_MESSAGE_CHANNEL_ID deve conter apenas digitos')
+    throw new Error(`CONFIG_INVALIDA: ${name} deve conter apenas digitos`)
   }
   return normalized
 }
@@ -305,8 +312,14 @@ function parseRenewal(env: NodeJS.ProcessEnv, integrations: IntegrationConfigs):
     'DISCORD_ROLES_MAX_OPS_PER_RUN',
     { min: 1, max: 10_000, defaultValue: 100 },
   )
-  const discordMessageChannelId = parseDiscordChannelId(env.DISCORD_MESSAGE_CHANNEL_ID)
-  const discordCallRoleId = parseDiscordChannelId(env.DISCORD_RENEWAL_CALL_ROLE_ID)
+  const discordMessageChannelId = parseDiscordSnowflake(
+    env.DISCORD_MESSAGE_CHANNEL_ID,
+    'DISCORD_MESSAGE_CHANNEL_ID',
+  )
+  const discordCallRoleId = parseDiscordSnowflake(
+    env.DISCORD_RENEWAL_CALL_ROLE_ID,
+    'DISCORD_RENEWAL_CALL_ROLE_ID',
+  )
   const discordMessageChannels = parseMessageChannels(env.DISCORD_MESSAGE_CHANNELS)
 
   if (
